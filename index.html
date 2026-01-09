@@ -1,23 +1,284 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>词汇表</title>
+    <meta charset="UTF-8">
+    <title>Patreon Login</title>
+    <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: #0d0d0d;
+            font-family: 'Libre Baskerville', serif;
+            color: #f5f5f5;
+            min-height: 100vh;
+        }
+
+        .bg-pattern {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: 
+                radial-gradient(circle at 20% 80%, rgba(249, 104, 84, 0.08) 0%, transparent 50%),
+                radial-gradient(circle at 80% 20%, rgba(249, 104, 84, 0.05) 0%, transparent 40%);
+            pointer-events: none;
+        }
+
+        .login-box {
+            position: absolute;
+            top: 50%; left: 50%;
+            width: 420px;
+            transform: translate(-50%, -50%);
+            background: rgba(20, 20, 20, 0.9);
+            border: 1px solid rgba(249, 104, 84, 0.2);
+            padding: 60px 50px;
+        }
+
+        .logo-area {
+            position: absolute;
+            top: -40px; left: 50%;
+            transform: translateX(-50%);
+            width: 80px; height: 80px;
+            background: #f96854;
+            display: flex; align-items: center; justify-content: center;
+        }
+
+        .logo-area svg { width: 40px; height: 40px; fill: #fff; }
+
+        h1 {
+            font-size: 24px;
+            font-weight: 400;
+            text-align: center;
+            margin-top: 30px;
+            margin-bottom: 40px;
+        }
+
+        .patreon-btn {
+            position: relative;
+            display: block;
+            width: 100%;
+            padding: 18px 24px;
+            background: #f96854;
+            border: none;
+            color: #fff;
+            font-family: 'Libre Baskerville', serif;
+            font-size: 15px;
+            cursor: pointer;
+            text-decoration: none;
+            text-align: center;
+        }
+
+        .patreon-btn:hover { background: #ff7b68; }
+
+        .patreon-btn svg {
+            position: absolute;
+            left: 24px; top: 50%;
+            transform: translateY(-50%);
+            width: 20px; height: 20px;
+            fill: #fff;
+        }
+
+        .user-info { text-align: center; }
+
+        .user-avatar {
+            width: 80px; height: 80px;
+            border-radius: 50%;
+            margin: 0 auto 20px;
+            border: 2px solid #f96854;
+        }
+
+        .user-name { font-size: 20px; margin-bottom: 8px; }
+
+        .user-email {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            color: #888;
+            margin-bottom: 10px;
+        }
+
+        .user-tier {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            color: #f96854;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 30px;
+        }
+
+        .logout-btn {
+            display: inline-block;
+            padding: 12px 30px;
+            background: transparent;
+            border: 1px solid rgba(249, 104, 84, 0.5);
+            color: #f96854;
+            font-family: 'Libre Baskerville', serif;
+            font-size: 13px;
+            cursor: pointer;
+        }
+
+        .logout-btn:hover {
+            background: rgba(249, 104, 84, 0.1);
+            border-color: #f96854;
+        }
+
+        .error {
+            background: rgba(200, 50, 50, 0.2);
+            border: 1px solid rgba(200, 50, 50, 0.5);
+            padding: 15px;
+            margin-bottom: 20px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            color: #f88;
+        }
+
+        .status {
+            position: absolute;
+            bottom: 30px; left: 50%;
+            transform: translateX(-50%);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            color: #444;
+        }
+    </style>
 </head>
-<body style="margin:0;padding:0;background:#f0f0f0;min-height:100vh;">
-  <div id="wordlist"></div>
-    <div id="wordlist"></div>
-  <script src ="website.js"></script>
-  <script>
-    const wl = createWordlistWidget('wordlist');
-    
-    // Demo data
-    wl.addWord('你好', 'greetings');
-    wl.addWord('谢谢', 'greetings');
-    wl.addWord('学习', 'verbs');
-    wl.updateRating('你好', 'recall', 4);
-    wl.updateRating('你好', 'production', 2);
-    wl.setLemma('学习', '学');
-  </script>
+<body>
+    <div class="bg-pattern"></div>
+    <div class="login-box" id="container"></div>
+    <div class="status" id="status">initializing</div>
+
+    <script>
+        // ============================================
+        // CONFIG - Set your Patreon app credentials
+        // ============================================
+        const CLIENT_ID = 'ZxsQwfDXcZTWQM8KRWIywvrSg8LBr_h5AWJ1RuRCx9Jp7z-U2U1T_uVLjVzZOh02';
+        const REDIRECT_URI = window.location.origin + window.location.pathname;
+
+        // ============================================
+        const container = document.getElementById('container');
+        const status = document.getElementById('status');
+
+        function setState(text, color = '#444') {
+            status.textContent = text;
+            status.style.color = color;
+        }
+
+        function generateState() {
+            const arr = new Uint8Array(16);
+            crypto.getRandomValues(arr);
+            return Array.from(arr, b => b.toString(16).padStart(2, '0')).join('');
+        }
+
+        function showLogin() {
+            container.innerHTML = `
+                <div class="logo-area">
+                    <svg viewBox="0 0 24 24"><path d="M14.82 2.41c3.96 0 7.18 3.24 7.18 7.21 0 3.96-3.22 7.18-7.18 7.18-3.97 0-7.21-3.22-7.21-7.18 0-3.97 3.24-7.21 7.21-7.21zM2 21.6h3.5V2.41H2V21.6z"/></svg>
+                </div>
+                <h1>Sign In</h1>
+                <a href="${getAuthUrl()}" class="patreon-btn">
+                    <svg viewBox="0 0 24 24"><path d="M14.82 2.41c3.96 0 7.18 3.24 7.18 7.21 0 3.96-3.22 7.18-7.18 7.18-3.97 0-7.21-3.22-7.21-7.18 0-3.97 3.24-7.21 7.21-7.21zM2 21.6h3.5V2.41H2V21.6z"/></svg>
+                    Continue with Patreon
+                </a>
+            `;
+            setState('ready');
+        }
+
+        function showUser(user) {
+            const initial = (user.name || 'U').charAt(0).toUpperCase();
+            const avatarSrc = user.avatar || `data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect fill="%23f96854" width="100" height="100"/><text x="50" y="65" font-size="45" fill="white" text-anchor="middle">${initial}</text></svg>`;
+            
+            container.innerHTML = `
+                <div class="user-info">
+                    <img class="user-avatar" src="${avatarSrc}" alt="">
+                    <p class="user-name">${user.name}</p>
+                    <p class="user-email">${user.email || ''}</p>
+                    <p class="user-tier">${user.tier || 'Free'}</p>
+                    <button class="logout-btn" onclick="logout()">Sign Out</button>
+                </div>
+            `;
+            setState('authenticated', '#4a9');
+        }
+
+        function showError(msg) {
+            container.innerHTML = `
+                <div class="error">${msg}</div>
+                <a href="${REDIRECT_URI}" class="patreon-btn">Try Again</a>
+            `;
+            setState('error', '#c44');
+        }
+
+        function getAuthUrl() {
+            const state = generateState();
+            sessionStorage.setItem('oauth_state', state);
+            const params = new URLSearchParams({
+                response_type: 'token',
+                client_id: CLIENT_ID,
+                redirect_uri: REDIRECT_URI,
+                scope: 'identity identity[email] identity.memberships',
+                state: state
+            });
+            return `https://www.patreon.com/oauth2/authorize?${params}`;
+        }
+
+        async function fetchUser(token) {
+            setState('fetching user...');
+            const res = await fetch('https://www.patreon.com/api/oauth2/v2/identity?include=memberships&fields[user]=full_name,email,image_url,thumb_url', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (!res.ok) throw new Error(`API error: ${res.status}`);
+            const data = await res.json();
+            const attr = data.data.attributes;
+            return {
+                name: attr.full_name,
+                email: attr.email,
+                avatar: attr.thumb_url || attr.image_url,
+                tier: data.included?.length ? 'Patron' : 'Free'
+            };
+        }
+
+        function logout() {
+            sessionStorage.removeItem('patreon_token');
+            window.location.href = REDIRECT_URI;
+        }
+
+        // ============================================
+        // INIT
+        // ============================================
+        (async function init() {
+            // Check for token in URL hash (implicit grant)
+            const hash = new URLSearchParams(window.location.hash.substring(1));
+            const token = hash.get('access_token');
+            const state = hash.get('state');
+
+            if (token) {
+                const savedState = sessionStorage.getItem('oauth_state');
+                if (state !== savedState) {
+                    showError('State mismatch - possible CSRF attack');
+                    return;
+                }
+                sessionStorage.setItem('patreon_token', token);
+                window.history.replaceState({}, '', REDIRECT_URI);
+            }
+
+            // Check for error in URL
+            const params = new URLSearchParams(window.location.search);
+            if (params.get('error')) {
+                showError(`${params.get('error')}: ${params.get('error_description') || ''}`);
+                return;
+            }
+
+            // Check stored token
+            const storedToken = sessionStorage.getItem('patreon_token');
+            if (storedToken) {
+                try {
+                    const user = await fetchUser(storedToken);
+                    showUser(user);
+                } catch (e) {
+                    sessionStorage.removeItem('patreon_token');
+                    showError(e.message);
+                }
+            } else {
+                showLogin();
+            }
+        })();
+    </script>
 </body>
 </html>
