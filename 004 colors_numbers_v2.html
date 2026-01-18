@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>颜色 / 数字</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #1a1a2e; color: #eee; font-family: system-ui, sans-serif; overflow: hidden; }
+#stage { position: absolute; width: 100%; height: 100%; }
+#demo-emoji { position: absolute; font-size: 100px; top: 35%; left: 50%; transform: translate(-50%, -50%); opacity: 0; transition: opacity 0.5s; }
+#demo-emoji.show { opacity: 1; }
+#bubble { position: absolute; top: 55%; left: 50%; transform: translateX(-50%); background: #fff; color: #222; font-size: 42px; padding: 12px 28px; border-radius: 20px; opacity: 0; transition: opacity 0.4s; }
+#bubble::after { content: ''; position: absolute; top: -18px; left: 50%; transform: translateX(-50%); border: 10px solid transparent; border-bottom-color: #fff; }
+#bubble.show { opacity: 1; }
+
+#quiz { position: absolute; width: 100%; height: 100%; display: none; }
+#quiz-prompt { position: absolute; font-size: 80px; top: 25%; left: 50%; transform: translateX(-50%); }
+#options { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); display: flex; gap: 20px; }
+.option-wrapper { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.thought-bubble { position: relative; background: #fff; border-radius: 20px; padding: 20px 30px; min-width: 80px; text-align: center; }
+.thought-bubble::before { content: ''; position: absolute; bottom: -10px; left: 50%; transform: translateX(-50%); width: 15px; height: 15px; background: #fff; border-radius: 50%; }
+.thought-bubble::after { content: ''; position: absolute; bottom: -20px; left: 50%; transform: translateX(-50%); width: 8px; height: 8px; background: #fff; border-radius: 50%; }
+.option-btn { font-size: 28px; padding: 12px 24px; border: 3px solid #555; border-radius: 12px; cursor: pointer; background: #3a3a5c; color: #eee; transition: border-color 0.2s; }
+.option-btn:hover { border-color: #888; }
+.option-btn.selected { border-color: #fff; background: #5a5a8c; }
+.speak-btn { font-size: 24px; padding: 8px 16px; border: none; border-radius: 8px; cursor: pointer; background: #2a2a4c; color: #eee; }
+.speak-btn:hover { background: #4a4a6c; }
+
+#commit-area { position: absolute; bottom: 15%; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 10px; }
+#commit-btn { font-size: 40px; padding: 15px 30px; border: none; border-radius: 50%; cursor: pointer; background: #3a3a5c; }
+#commit-btn:hover { background: #5a5a8c; }
+
+#progress { position: absolute; top: 3%; right: 3%; font-size: 24px; color: #888; }
+#feedback { position: absolute; top: 35%; left: 50%; transform: translate(-50%, -50%); font-size: 100px; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
+</style>
+</head>
+<body>
+
+<div id="stage">
+  <div id="demo-emoji"></div>
+  <div id="bubble"></div>
+</div>
+
+<div id="quiz">
+  <div id="quiz-prompt"></div>
+  <div id="options"></div>
+  <div id="commit-area">
+    <button id="commit-btn" onclick="commitAnswer()">👄</button>
+  </div>
+  <div id="progress"></div>
+  <div id="feedback"></div>
+</div>
+
+<script>
+const allColors = {
+  red: { zh: '红色', short: '红', emoji: '🔴', items: ['🍎', '🍒', '❤️'] },
+  blue: { zh: '蓝色', short: '蓝', emoji: '🔵', items: ['💙', '🫐', '🧢'] },
+  yellow: { zh: '黄色', short: '黄', emoji: '🟡', items: ['⭐', '🍋', '🌻'] },
+  green: { zh: '绿色', short: '绿', emoji: '🟢', items: ['🍀', '🥒', '💚'] },
+  orange: { zh: '橙色', short: '橙', emoji: '🟠', items: ['🍊', '🥕', '🧡'] },
+  purple: { zh: '紫色', short: '紫', emoji: '🟣', items: ['🍇', '🍆', '💜'] }
+};
+
+const numbers = { 1: '一', 2: '两', 3: '三' };
+
+// Pick 2 random colors for this lesson
+const colorKeys = Object.keys(allColors);
+const shuffled = colorKeys.sort(() => Math.random() - 0.5);
+const lessonColors = [shuffled[0], shuffled[1]];
+const colors = {};
+lessonColors.forEach(k => colors[k] = allColors[k]);
+
+const demoSequence = [];
+
+// 1. First color: show twice
+const c1 = colors[lessonColors[0]];
+demoSequence.push({ emoji: c1.emoji, word: c1.zh });
+demoSequence.push({ emoji: c1.emoji, word: c1.zh });
+
+// 2. Second color: show twice
+const c2 = colors[lessonColors[1]];
+demoSequence.push({ emoji: c2.emoji, word: c2.zh });
+demoSequence.push({ emoji: c2.emoji, word: c2.zh });
+
+// 3. Contrast both
+demoSequence.push({ emoji: c1.emoji, word: c1.zh });
+demoSequence.push({ emoji: c2.emoji, word: c2.zh });
+demoSequence.push({ emoji: c1.emoji, word: c1.zh });
+
+// 4. Show items for color 1
+c1.items.forEach(item => {
+  demoSequence.push({ emoji: item, word: c1.zh });
+});
+
+// 5. Show items for color 2
+c2.items.forEach(item => {
+  demoSequence.push({ emoji: item, word: c2.zh });
+});
+
+// 6. Introduce counting with color 1
+for (let n = 1; n <= 3; n++) {
+  const emoji = c1.items[0].repeat(n);
+  const word = numbers[n] + '个' + c1.short;
+  demoSequence.push({ emoji, word });
+}
+
+// 7. Counting with color 2
+for (let n = 1; n <= 3; n++) {
+  const emoji = c2.items[0].repeat(n);
+  const word = numbers[n] + '个' + c2.short;
+  demoSequence.push({ emoji, word });
+}
+
+// 8. Mixed counting examples
+lessonColors.forEach(k => {
+  const c = colors[k];
+  for (let n = 1; n <= 3; n++) {
+    const item = c.items[n % c.items.length];
+    const emoji = item.repeat(n);
+    const word = numbers[n] + '个' + c.short;
+    demoSequence.push({ emoji, word });
+  }
+});
+
+// Build quiz: only uses the 2 lesson colors
+const quizItems = [];
+for (let i = 0; i < 8; i++) {
+  const cKey = lessonColors[Math.floor(Math.random() * 2)];
+  const c = colors[cKey];
+  const n = Math.floor(Math.random() * 3) + 1;
+  const item = c.items[Math.floor(Math.random() * c.items.length)];
+  const emoji = item.repeat(n);
+  const word = numbers[n] + '个' + c.short;
+  
+  // Generate 3 wrong options from lesson colors only
+  const options = [{ word, correct: true }];
+  while (options.length < 4) {
+    const wrongCKey = lessonColors[Math.floor(Math.random() * 2)];
+    const wrongC = colors[wrongCKey];
+    const wrongN = Math.floor(Math.random() * 3) + 1;
+    const wrongWord = numbers[wrongN] + '个' + wrongC.short;
+    if (!options.find(o => o.word === wrongWord)) {
+      options.push({ word: wrongWord, correct: false });
+    }
+  }
+  options.sort(() => Math.random() - 0.5);
+  quizItems.push({ emoji, correctWord: word, options });
+}
+
+let demoIndex = 0;
+let quizIndex = 0;
+let selectedOption = null;
+
+const demoEmojiEl = document.getElementById('demo-emoji');
+const bubbleEl = document.getElementById('bubble');
+const stageEl = document.getElementById('stage');
+const quizEl = document.getElementById('quiz');
+const quizPromptEl = document.getElementById('quiz-prompt');
+const optionsEl = document.getElementById('options');
+const progressEl = document.getElementById('progress');
+const feedbackEl = document.getElementById('feedback');
+
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+function speak(text, cb) {
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = 'zh-CN';
+  u.rate = 0.8;
+  if (cb) u.onend = cb;
+  speechSynthesis.speak(u);
+}
+
+function playTone(freq, duration, type) {
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = type || 'sine';
+  osc.frequency.value = freq;
+  gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.start();
+  osc.stop(audioCtx.currentTime + duration);
+}
+
+function playPositive() {
+  playTone(523, 0.1, 'sine');
+  setTimeout(() => playTone(659, 0.15, 'sine'), 100);
+}
+
+function playNegative() {
+  playTone(200, 0.15, 'square');
+  setTimeout(() => playTone(150, 0.3, 'square'), 150);
+}
+
+function showDemo() {
+  if (demoIndex >= demoSequence.length) {
+    setTimeout(startQuiz, 1000);
+    return;
+  }
+  
+  const item = demoSequence[demoIndex];
+  demoEmojiEl.textContent = item.emoji;
+  demoEmojiEl.className = '';
+  bubbleEl.className = '';
+  bubbleEl.textContent = '';
+  
+  setTimeout(() => demoEmojiEl.classList.add('show'), 200);
+  setTimeout(() => {
+    bubbleEl.textContent = item.word;
+    bubbleEl.classList.add('show');
+    speak(item.word);
+  }, 800);
+  setTimeout(() => {
+    demoEmojiEl.classList.remove('show');
+    bubbleEl.classList.remove('show');
+  }, 2500);
+  setTimeout(() => {
+    demoIndex++;
+    showDemo();
+  }, 3200);
+}
+
+function startQuiz() {
+  stageEl.style.display = 'none';
+  quizEl.style.display = 'block';
+  showQuizItem();
+}
+
+function showQuizItem() {
+  selectedOption = null;
+  
+  if (quizIndex >= quizItems.length) {
+    quizPromptEl.textContent = '✓';
+    optionsEl.innerHTML = '';
+    document.getElementById('commit-area').style.display = 'none';
+    progressEl.textContent = '完成!';
+    return;
+  }
+  
+  const item = quizItems[quizIndex];
+  quizPromptEl.textContent = item.emoji;
+  progressEl.textContent = (quizIndex + 1) + ' / ' + quizItems.length;
+  
+  optionsEl.innerHTML = '';
+  item.options.forEach((opt, i) => {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'option-wrapper';
+    
+    const bubble = document.createElement('div');
+    bubble.className = 'thought-bubble';
+    
+    const speakBtn = document.createElement('button');
+    speakBtn.className = 'speak-btn';
+    speakBtn.textContent = '🔊';
+    speakBtn.onclick = (e) => {
+      e.stopPropagation();
+      speak(opt.word);
+    };
+    bubble.appendChild(speakBtn);
+    
+    const selectBtn = document.createElement('button');
+    selectBtn.className = 'option-btn';
+    selectBtn.textContent = String.fromCharCode(65 + i);
+    selectBtn.onclick = () => selectOption(i, selectBtn);
+    
+    wrapper.appendChild(bubble);
+    wrapper.appendChild(selectBtn);
+    optionsEl.appendChild(wrapper);
+  });
+}
+
+function selectOption(index, btn) {
+  document.querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  selectedOption = index;
+}
+
+function commitAnswer() {
+  if (selectedOption === null) return;
+  
+  const item = quizItems[quizIndex];
+  const correct = item.options[selectedOption].correct;
+  
+  if (correct) {
+    feedbackEl.textContent = '✓';
+    feedbackEl.style.color = '#4f4';
+    feedbackEl.style.opacity = 1;
+    playPositive();
+    speak(item.correctWord);
+  } else {
+    feedbackEl.textContent = '✗';
+    feedbackEl.style.color = '#f44';
+    feedbackEl.style.opacity = 1;
+    playNegative();
+  }
+  
+  setTimeout(() => {
+    feedbackEl.style.opacity = 0;
+    quizIndex++;
+    showQuizItem();
+  }, 1500);
+}
+
+document.body.addEventListener('click', function init() {
+  audioCtx.resume();
+  document.body.removeEventListener('click', init);
+}, { once: true });
+
+setTimeout(showDemo, 800);
+</script>
+
+</body>
+</html>

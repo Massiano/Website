@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>声音</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #1a1a2e; color: #eee; font-family: system-ui, sans-serif; overflow: hidden; }
+
+#stage { position: absolute; width: 100%; height: 100%; }
+#item-emoji { position: absolute; font-size: 140px; top: 28%; left: 50%; transform: translate(-50%, -50%); }
+#bubble { position: absolute; top: 52%; left: 50%; transform: translateX(-50%); background: #fff; color: #222; font-size: 48px; padding: 18px 36px; border-radius: 20px; font-family: system-ui, sans-serif; letter-spacing: 8px; }
+#bubble::after { content: ''; position: absolute; top: -18px; left: 50%; transform: translateX(-50%); border: 10px solid transparent; border-bottom-color: #fff; }
+
+#name-display { position: absolute; top: 70%; left: 50%; transform: translateX(-50%); font-size: 28px; color: #888; }
+
+#controls { position: absolute; bottom: 12%; left: 50%; transform: translateX(-50%); display: flex; gap: 30px; }
+.nav-btn { font-size: 50px; padding: 15px 35px; border: none; border-radius: 16px; cursor: pointer; background: #3a3a5c; color: #eee; }
+.nav-btn:hover { background: #5a5a8c; }
+#speak-btn { font-size: 50px; padding: 15px 30px; border: none; border-radius: 50%; cursor: pointer; background: #4a6a4a; color: #eee; }
+#speak-btn:hover { background: #6a8a6a; }
+
+#counter { position: absolute; top: 3%; right: 3%; font-size: 22px; color: #666; }
+#category { position: absolute; top: 3%; left: 3%; font-size: 18px; color: #555; }
+</style>
+</head>
+<body>
+
+<div id="stage">
+  <div id="category"></div>
+  <div id="counter"></div>
+  <div id="item-emoji"></div>
+  <div id="bubble"></div>
+  <div id="name-display"></div>
+  <div id="controls">
+    <button class="nav-btn" id="prev-btn">◀</button>
+    <button id="speak-btn">🔊</button>
+    <button class="nav-btn" id="next-btn">▶</button>
+  </div>
+</div>
+
+<script>
+const items = [
+  // 动物
+  { emoji: '🐕', name: '狗', sound: '汪汪', category: '动物' },
+  { emoji: '🐈', name: '猫', sound: '喵喵', category: '动物' },
+  { emoji: '🐄', name: '牛', sound: '哞哞', category: '动物' },
+  { emoji: '🐖', name: '猪', sound: '哼哼', category: '动物' },
+  { emoji: '🐓', name: '公鸡', sound: '喔喔喔', category: '动物' },
+  { emoji: '🐸', name: '青蛙', sound: '呱呱', category: '动物' },
+  { emoji: '🦆', name: '鸭子', sound: '嘎嘎', category: '动物' },
+  { emoji: '🐝', name: '蜜蜂', sound: '嗡嗡', category: '动物' },
+  { emoji: '🐦', name: '小鸟', sound: '叽叽喳喳', category: '动物' },
+  { emoji: '🦁', name: '狮子', sound: '吼', category: '动物' },
+  { emoji: '🐑', name: '羊', sound: '咩咩', category: '动物' },
+  { emoji: '🐴', name: '马', sound: '嘶嘶', category: '动物' },
+  
+  // 自然
+  { emoji: '💧', name: '水滴', sound: '滴答', category: '自然' },
+  { emoji: '🌊', name: '波浪', sound: '哗哗', category: '自然' },
+  { emoji: '⚡', name: '雷电', sound: '轰隆隆', category: '自然' },
+  { emoji: '🌬️', name: '风', sound: '呼呼', category: '自然' },
+  { emoji: '🌧️', name: '雨', sound: '淅沥沥', category: '自然' },
+  { emoji: '🔥', name: '火', sound: '噼里啪啦', category: '自然' },
+  
+  // 物品
+  { emoji: '🚗', name: '汽车', sound: '嘟嘟', category: '物品' },
+  { emoji: '🚂', name: '火车', sound: '呜呜', category: '物品' },
+  { emoji: '✈️', name: '飞机', sound: '嗖', category: '物品' },
+  { emoji: '🔔', name: '钟', sound: '叮当', category: '物品' },
+  { emoji: '📞', name: '电话', sound: '铃铃铃', category: '物品' },
+  { emoji: '⏰', name: '时钟', sound: '滴答滴答', category: '物品' },
+  { emoji: '🚪', name: '门', sound: '吱呀', category: '物品' },
+  { emoji: '🔨', name: '锤子', sound: '咚咚', category: '物品' },
+  { emoji: '🎹', name: '钢琴', sound: '叮叮咚咚', category: '物品' },
+  
+  // 身体
+  { emoji: '💓', name: '心跳', sound: '扑通扑通', category: '身体' },
+  { emoji: '🤧', name: '打喷嚏', sound: '阿嚏', category: '身体' },
+  { emoji: '😴', name: '打呼噜', sound: '呼噜呼噜', category: '身体' },
+  { emoji: '👏', name: '拍手', sound: '啪啪啪', category: '身体' },
+  { emoji: '😋', name: '吃东西', sound: '吧唧吧唧', category: '身体' },
+  { emoji: '😂', name: '笑', sound: '哈哈哈', category: '身体' },
+  { emoji: '😢', name: '哭', sound: '呜呜呜', category: '身体' },
+  
+  // 厨房
+  { emoji: '🍳', name: '煎锅', sound: '滋滋', category: '厨房' },
+  { emoji: '🫖', name: '水壶', sound: '咕嘟咕嘟', category: '厨房' },
+  { emoji: '🍿', name: '爆米花', sound: '噼啪', category: '厨房' },
+  { emoji: '🥢', name: '筷子', sound: '咔嗒', category: '厨房' },
+];
+
+let currentIndex = 0;
+
+const emojiEl = document.getElementById('item-emoji');
+const bubbleEl = document.getElementById('bubble');
+const nameEl = document.getElementById('name-display');
+const counterEl = document.getElementById('counter');
+const categoryEl = document.getElementById('category');
+
+function speak(text, rate) {
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = 'zh-CN';
+  u.rate = rate || 0.75;
+  speechSynthesis.speak(u);
+}
+
+function showItem() {
+  const item = items[currentIndex];
+  emojiEl.textContent = item.emoji;
+  bubbleEl.textContent = item.sound;
+  nameEl.textContent = item.name;
+  counterEl.textContent = (currentIndex + 1) + ' / ' + items.length;
+  categoryEl.textContent = item.category;
+}
+
+function speakCurrent() {
+  const item = items[currentIndex];
+  speak(item.sound, 0.7);
+}
+
+function next() {
+  currentIndex = (currentIndex + 1) % items.length;
+  showItem();
+}
+
+function prev() {
+  currentIndex = (currentIndex - 1 + items.length) % items.length;
+  showItem();
+}
+
+document.getElementById('next-btn').onclick = next;
+document.getElementById('prev-btn').onclick = prev;
+document.getElementById('speak-btn').onclick = speakCurrent;
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowRight') next();
+  else if (e.key === 'ArrowLeft') prev();
+  else if (e.key === ' ') { e.preventDefault(); speakCurrent(); }
+});
+
+showItem();
+</script>
+
+</body>
+</html>

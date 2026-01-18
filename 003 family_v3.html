@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>家人</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #1a1a2e; color: #eee; font-family: system-ui, sans-serif; overflow: hidden; }
+
+#setup { position: absolute; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 30px; }
+#setup h1 { font-size: 48px; }
+#setup label { font-size: 24px; }
+#setup select { font-size: 24px; padding: 10px 20px; }
+#setup button { font-size: 28px; padding: 15px 40px; border: none; border-radius: 12px; cursor: pointer; background: #3a3a5c; color: #eee; }
+#setup button:hover { background: #5a5a8c; }
+
+#stage { position: absolute; width: 100%; height: 100%; display: none; }
+#speaker { position: absolute; font-size: 80px; left: 15%; top: 40%; transform: translateY(-50%); }
+#speaker-bubble { position: absolute; left: 22%; top: 20%; background: #fff; color: #222; font-size: 36px; padding: 12px 24px; border-radius: 20px; opacity: 0; transition: opacity 0.4s; white-space: nowrap; }
+#speaker-bubble::after { content: ''; position: absolute; bottom: -18px; left: 20%; border: 10px solid transparent; border-top-color: #fff; }
+#speaker-bubble.show { opacity: 1; }
+#family-area { position: absolute; right: 15%; top: 40%; transform: translateY(-50%); display: flex; gap: 40px; }
+.family-member { position: relative; font-size: 70px; }
+#arrow { position: absolute; font-size: 50px; color: #f55; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
+#arrow.show { opacity: 1; }
+
+#quiz { position: absolute; width: 100%; height: 100%; display: none; }
+#quiz-speaker { position: absolute; font-size: 80px; left: 15%; top: 40%; transform: translateY(-50%); }
+#quiz-family-area { position: absolute; right: 15%; top: 40%; transform: translateY(-50%); display: flex; gap: 40px; }
+#quiz-arrow { position: absolute; font-size: 50px; color: #f55; }
+#quiz-bubble { position: absolute; left: 22%; top: 20%; background: #fff; color: #222; font-size: 36px; padding: 12px 24px; border-radius: 20px; white-space: nowrap; }
+#quiz-bubble::after { content: ''; position: absolute; bottom: -18px; left: 20%; border: 10px solid transparent; border-top-color: #fff; }
+#options { position: absolute; bottom: 20%; left: 50%; transform: translateX(-50%); display: flex; gap: 15px; }
+.option-btn { font-size: 24px; padding: 14px 28px; border: 3px solid #555; border-radius: 12px; cursor: pointer; background: #3a3a5c; color: #eee; }
+.option-btn:hover { border-color: #888; }
+.option-btn.selected { border-color: #fff; background: #5a5a8c; }
+#commit-btn { position: absolute; bottom: 8%; left: 50%; transform: translateX(-50%); font-size: 40px; padding: 15px 30px; border: none; border-radius: 50%; cursor: pointer; background: #3a3a5c; }
+#commit-btn:hover { background: #5a5a8c; }
+#progress { position: absolute; top: 3%; right: 3%; font-size: 24px; color: #888; }
+#feedback { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 100px; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
+</style>
+</head>
+<body>
+
+<div id="setup">
+  <h1>家人</h1>
+  <label>
+    学几个? 
+    <select id="count-select">
+      <option value="2">2</option>
+      <option value="3" selected>3</option>
+      <option value="4">4</option>
+      <option value="5">5</option>
+      <option value="6">6</option>
+    </select>
+  </label>
+  <button onclick="startLesson()">开始</button>
+</div>
+
+<div id="stage">
+  <div id="speaker"></div>
+  <div id="speaker-bubble"></div>
+  <div id="family-area"></div>
+  <div id="arrow">⬆️</div>
+</div>
+
+<div id="quiz">
+  <div id="quiz-speaker"></div>
+  <div id="quiz-bubble">?</div>
+  <div id="quiz-family-area"></div>
+  <div id="quiz-arrow">⬆️</div>
+  <div id="options"></div>
+  <button id="commit-btn" onclick="commitAnswer()">👄</button>
+  <div id="progress"></div>
+  <div id="feedback"></div>
+</div>
+
+<script>
+const people = {
+  boy: { emoji: '👦', gender: 'male', age: 'child' },
+  girl: { emoji: '👧', gender: 'female', age: 'child' },
+  man: { emoji: '👨', gender: 'male', age: 'adult' },
+  woman: { emoji: '👩', gender: 'female', age: 'adult' },
+  oldMan: { emoji: '👴', gender: 'male', age: 'old' },
+  oldWoman: { emoji: '👵', gender: 'female', age: 'old' }
+};
+
+const relations = {
+  dad: { zh: '爸爸', targets: ['man'], speakerAge: ['child'] },
+  mom: { zh: '妈妈', targets: ['woman'], speakerAge: ['child'] },
+  grandpa: { zh: '爷爷', targets: ['oldMan'], speakerAge: ['child'] },
+  grandma: { zh: '奶奶', targets: ['oldWoman'], speakerAge: ['child'] },
+  brother: { zh: '哥哥', targets: ['boy'], speakerAge: ['child'] },
+  sister: { zh: '姐姐', targets: ['girl'], speakerAge: ['child'] },
+  son: { zh: '儿子', targets: ['boy'], speakerAge: ['adult'] },
+  daughter: { zh: '女儿', targets: ['girl'], speakerAge: ['adult'] }
+};
+
+let lessonRelations = [];
+let demoSequence = [];
+let quizItems = [];
+let demoIndex = 0;
+let quizIndex = 0;
+let selectedOption = null;
+
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+function pickSpeaker(relation) {
+  const rel = relations[relation];
+  const validSpeakers = Object.entries(people).filter(([k, p]) => rel.speakerAge.includes(p.age));
+  return validSpeakers[Math.floor(Math.random() * validSpeakers.length)];
+}
+
+function pickTarget(relation) {
+  const rel = relations[relation];
+  const key = rel.targets[Math.floor(Math.random() * rel.targets.length)];
+  return [key, people[key]];
+}
+
+function pickOtherPerson(excludeKeys) {
+  const available = Object.entries(people).filter(([k]) => !excludeKeys.includes(k));
+  return available[Math.floor(Math.random() * available.length)];
+}
+
+function createDemoItem(relKey) {
+  const rel = relations[relKey];
+  const [speakerKey, speaker] = pickSpeaker(relKey);
+  const [targetKey, target] = pickTarget(relKey);
+  const [otherKey, other] = pickOtherPerson([speakerKey, targetKey]);
+  const family = Math.random() > 0.5 ? [target.emoji, other.emoji] : [other.emoji, target.emoji];
+  return {
+    speaker: speaker.emoji,
+    family,
+    targetIndex: family.indexOf(target.emoji),
+    word: '我的' + rel.zh
+  };
+}
+
+function startLesson() {
+  const count = parseInt(document.getElementById('count-select').value);
+  
+  const relationKeys = Object.keys(relations);
+  const shuffled = relationKeys.sort(() => Math.random() - 0.5);
+  lessonRelations = shuffled.slice(0, count);
+  
+  // Build demo: 2 examples per relation, then 1 contrast round
+  demoSequence = [];
+  lessonRelations.forEach(relKey => {
+    demoSequence.push(createDemoItem(relKey));
+    demoSequence.push(createDemoItem(relKey));
+  });
+  // Quick contrast
+  lessonRelations.forEach(relKey => {
+    demoSequence.push(createDemoItem(relKey));
+  });
+  
+  // Build quiz
+  quizItems = [];
+  for (let i = 0; i < Math.max(6, count * 2); i++) {
+    const relKey = lessonRelations[i % lessonRelations.length];
+    const rel = relations[relKey];
+    const [speakerKey, speaker] = pickSpeaker(relKey);
+    const [targetKey, target] = pickTarget(relKey);
+    const [otherKey, other] = pickOtherPerson([speakerKey, targetKey]);
+    const family = Math.random() > 0.5 ? [target.emoji, other.emoji] : [other.emoji, target.emoji];
+    const correctWord = '我的' + rel.zh;
+    
+    const options = lessonRelations.map(rk => ({
+      word: '我的' + relations[rk].zh,
+      correct: rk === relKey
+    }));
+    options.sort(() => Math.random() - 0.5);
+    
+    quizItems.push({
+      speaker: speaker.emoji,
+      family,
+      targetIndex: family.indexOf(target.emoji),
+      correctWord,
+      options
+    });
+  }
+  
+  document.getElementById('setup').style.display = 'none';
+  document.getElementById('stage').style.display = 'block';
+  demoIndex = 0;
+  quizIndex = 0;
+  setTimeout(showDemo, 500);
+}
+
+function speak(text, cb) {
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = 'zh-CN';
+  u.rate = 0.7;
+  if (cb) u.onend = cb;
+  speechSynthesis.speak(u);
+}
+
+function playTone(freq, duration, type) {
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = type || 'sine';
+  osc.frequency.value = freq;
+  gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.start();
+  osc.stop(audioCtx.currentTime + duration);
+}
+
+function playPositive() {
+  playTone(523, 0.1, 'sine');
+  setTimeout(() => playTone(659, 0.15, 'sine'), 100);
+}
+
+function playNegative() {
+  playTone(200, 0.15, 'square');
+  setTimeout(() => playTone(150, 0.3, 'square'), 150);
+}
+
+function positionArrow(familyArea, targetIndex, arrowElement) {
+  const members = familyArea.children;
+  if (members[targetIndex]) {
+    const rect = members[targetIndex].getBoundingClientRect();
+    const parentRect = familyArea.parentElement.getBoundingClientRect();
+    arrowElement.style.left = (rect.left - parentRect.left + rect.width / 2 - 25) + 'px';
+    arrowElement.style.top = (rect.top - parentRect.top + rect.height + 5) + 'px';
+  }
+}
+
+function showDemo() {
+  if (demoIndex >= demoSequence.length) {
+    setTimeout(startQuiz, 1000);
+    return;
+  }
+  
+  const item = demoSequence[demoIndex];
+  const speakerEl = document.getElementById('speaker');
+  const bubbleEl = document.getElementById('speaker-bubble');
+  const familyAreaEl = document.getElementById('family-area');
+  const arrowEl = document.getElementById('arrow');
+  
+  speakerEl.textContent = item.speaker;
+  familyAreaEl.innerHTML = '';
+  item.family.forEach(emoji => {
+    const div = document.createElement('div');
+    div.className = 'family-member';
+    div.textContent = emoji;
+    familyAreaEl.appendChild(div);
+  });
+  
+  bubbleEl.className = '';
+  bubbleEl.textContent = '';
+  arrowEl.className = '';
+  
+  setTimeout(() => {
+    positionArrow(familyAreaEl, item.targetIndex, arrowEl);
+    arrowEl.classList.add('show');
+  }, 400);
+  
+  setTimeout(() => {
+    bubbleEl.textContent = '这个人';
+    bubbleEl.classList.add('show');
+    speak('这个人');
+  }, 900);
+  
+  setTimeout(() => {
+    bubbleEl.textContent = item.word;
+    speak(item.word);
+  }, 2200);
+  
+  setTimeout(() => {
+    speak(item.word);
+  }, 3500);
+  
+  setTimeout(() => {
+    bubbleEl.classList.remove('show');
+    arrowEl.classList.remove('show');
+  }, 5000);
+  
+  setTimeout(() => {
+    demoIndex++;
+    showDemo();
+  }, 5700);
+}
+
+function startQuiz() {
+  document.getElementById('stage').style.display = 'none';
+  document.getElementById('quiz').style.display = 'block';
+  showQuizItem();
+}
+
+function showQuizItem() {
+  selectedOption = null;
+  const quizSpeakerEl = document.getElementById('quiz-speaker');
+  const quizBubbleEl = document.getElementById('quiz-bubble');
+  const quizFamilyAreaEl = document.getElementById('quiz-family-area');
+  const quizArrowEl = document.getElementById('quiz-arrow');
+  const optionsEl = document.getElementById('options');
+  const progressEl = document.getElementById('progress');
+  
+  if (quizIndex >= quizItems.length) {
+    quizSpeakerEl.textContent = '✓';
+    quizFamilyAreaEl.innerHTML = '';
+    quizArrowEl.style.display = 'none';
+    quizBubbleEl.style.display = 'none';
+    optionsEl.innerHTML = '';
+    document.getElementById('commit-btn').style.display = 'none';
+    progressEl.textContent = '完成!';
+    return;
+  }
+  
+  const item = quizItems[quizIndex];
+  
+  quizSpeakerEl.textContent = item.speaker;
+  quizFamilyAreaEl.innerHTML = '';
+  item.family.forEach(emoji => {
+    const div = document.createElement('div');
+    div.className = 'family-member';
+    div.textContent = emoji;
+    quizFamilyAreaEl.appendChild(div);
+  });
+  
+  setTimeout(() => positionArrow(quizFamilyAreaEl, item.targetIndex, quizArrowEl), 100);
+  
+  quizBubbleEl.textContent = '?';
+  progressEl.textContent = (quizIndex + 1) + ' / ' + quizItems.length;
+  
+  optionsEl.innerHTML = '';
+  item.options.forEach((opt, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'option-btn';
+    btn.textContent = '🔊';
+    btn.onclick = () => {
+      speak(opt.word);
+      document.querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      selectedOption = i;
+    };
+    optionsEl.appendChild(btn);
+  });
+}
+
+function commitAnswer() {
+  if (selectedOption === null) return;
+  
+  const item = quizItems[quizIndex];
+  const correct = item.options[selectedOption].correct;
+  const feedbackEl = document.getElementById('feedback');
+  
+  if (correct) {
+    feedbackEl.textContent = '✓';
+    feedbackEl.style.color = '#4f4';
+    feedbackEl.style.opacity = 1;
+    playPositive();
+    speak(item.correctWord);
+  } else {
+    feedbackEl.textContent = '✗';
+    feedbackEl.style.color = '#f44';
+    feedbackEl.style.opacity = 1;
+    playNegative();
+  }
+  
+  setTimeout(() => {
+    feedbackEl.style.opacity = 0;
+    quizIndex++;
+    showQuizItem();
+  }, 1800);
+}
+
+document.body.addEventListener('click', function init() {
+  audioCtx.resume();
+  document.body.removeEventListener('click', init);
+}, { once: true });
+</script>
+
+</body>
+</html>

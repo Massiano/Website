@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>动物</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #1a1a2e; color: #eee; font-family: system-ui, sans-serif; overflow: hidden; }
+
+#stage { position: absolute; width: 100%; height: 100%; }
+#demo-animal { position: absolute; font-size: 120px; top: 35%; left: 50%; transform: translate(-50%, -50%); opacity: 0; transition: opacity 0.5s; }
+#demo-animal.show { opacity: 1; }
+#bubble { position: absolute; top: 58%; left: 50%; transform: translateX(-50%); background: #fff; color: #222; font-size: 38px; padding: 14px 28px; border-radius: 20px; opacity: 0; transition: opacity 0.4s; }
+#bubble::after { content: ''; position: absolute; top: -18px; left: 50%; transform: translateX(-50%); border: 10px solid transparent; border-bottom-color: #fff; }
+#bubble.show { opacity: 1; }
+
+#quiz { position: absolute; width: 100%; height: 100%; display: none; }
+#quiz-animal { position: absolute; font-size: 100px; top: 25%; left: 50%; transform: translateX(-50%); }
+#quiz-prompt { position: absolute; top: 45%; left: 50%; transform: translateX(-50%); font-size: 24px; color: #aaa; }
+#options { position: absolute; top: 58%; left: 50%; transform: translateX(-50%); display: flex; gap: 25px; }
+.option-wrapper { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.thought-bubble { position: relative; background: #fff; border-radius: 20px; padding: 18px 26px; }
+.thought-bubble::before { content: ''; position: absolute; bottom: -10px; left: 50%; transform: translateX(-50%); width: 14px; height: 14px; background: #fff; border-radius: 50%; }
+.thought-bubble::after { content: ''; position: absolute; bottom: -20px; left: 50%; transform: translateX(-50%); width: 8px; height: 8px; background: #fff; border-radius: 50%; }
+.speak-btn { font-size: 28px; padding: 10px 18px; border: none; border-radius: 10px; cursor: pointer; background: #2a2a4c; color: #eee; }
+.speak-btn:hover { background: #4a4a6c; }
+.select-btn { font-size: 24px; padding: 12px 28px; border: 3px solid #555; border-radius: 12px; cursor: pointer; background: #3a3a5c; color: #eee; }
+.select-btn:hover { border-color: #888; }
+.select-btn.selected { border-color: #fff; background: #5a5a8c; }
+
+#commit-btn { position: absolute; bottom: 10%; left: 50%; transform: translateX(-50%); font-size: 40px; padding: 15px 30px; border: none; border-radius: 50%; cursor: pointer; background: #3a3a5c; }
+#commit-btn:hover { background: #5a5a8c; }
+
+#progress { position: absolute; top: 3%; right: 3%; font-size: 24px; color: #888; }
+#feedback { position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%); font-size: 100px; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
+</style>
+</head>
+<body>
+
+<div id="stage">
+  <div id="demo-animal"></div>
+  <div id="bubble"></div>
+</div>
+
+<div id="quiz">
+  <div id="quiz-animal"></div>
+  <div id="quiz-prompt">谁能吓跑它?</div>
+  <div id="options"></div>
+  <button id="commit-btn" onclick="commitAnswer()">👄</button>
+  <div id="progress"></div>
+  <div id="feedback"></div>
+</div>
+
+<script>
+const animals = {
+  dog: { emoji: '🐕', name: '狗', sound: '汪汪', scary: 3 },
+  cat: { emoji: '🐱', name: '猫', sound: '喵喵', scary: 2 },
+  cow: { emoji: '🐄', name: '牛', sound: '哞哞', scary: 4 },
+  pig: { emoji: '🐷', name: '猪', sound: '哼哼', scary: 2 },
+  sheep: { emoji: '🐑', name: '羊', sound: '咩咩', scary: 1 },
+  rooster: { emoji: '🐓', name: '公鸡', sound: '喔喔喔', scary: 1 },
+  duck: { emoji: '🦆', name: '鸭子', sound: '嘎嘎', scary: 1 },
+  frog: { emoji: '🐸', name: '青蛙', sound: '呱呱', scary: 0 },
+  bird: { emoji: '🐦', name: '小鸟', sound: '叽叽', scary: 0 },
+  lion: { emoji: '🦁', name: '狮子', sound: '吼', scary: 6 },
+  tiger: { emoji: '🐯', name: '老虎', sound: '嗷呜', scary: 6 },
+  wolf: { emoji: '🐺', name: '狼', sound: '嗷呜', scary: 5 }
+};
+
+const animalKeys = Object.keys(animals);
+const shuffled = animalKeys.sort(() => Math.random() - 0.5);
+const lessonAnimals = shuffled.slice(0, 5);
+
+const demoSequence = [];
+lessonAnimals.forEach(key => {
+  demoSequence.push({ key, ...animals[key] });
+  demoSequence.push({ key, ...animals[key] });
+});
+
+const quizItems = [];
+for (let i = 0; i < 6; i++) {
+  const targetKey = lessonAnimals[i % lessonAnimals.length];
+  const target = animals[targetKey];
+  
+  const scarier = lessonAnimals.filter(k => animals[k].scary > target.scary);
+  const notScarier = lessonAnimals.filter(k => animals[k].scary <= target.scary && k !== targetKey);
+  
+  if (scarier.length === 0 || notScarier.length < 2) continue;
+  
+  const correctKey = scarier[Math.floor(Math.random() * scarier.length)];
+  const wrongKeys = notScarier.sort(() => Math.random() - 0.5).slice(0, 2);
+  
+  const options = [
+    { key: correctKey, ...animals[correctKey], correct: true },
+    { key: wrongKeys[0], ...animals[wrongKeys[0]], correct: false },
+    { key: wrongKeys[1], ...animals[wrongKeys[1]], correct: false }
+  ].sort(() => Math.random() - 0.5);
+  
+  quizItems.push({
+    target: { key: targetKey, ...target },
+    options
+  });
+}
+
+let demoIndex = 0;
+let quizIndex = 0;
+let selectedOption = null;
+
+const demoAnimalEl = document.getElementById('demo-animal');
+const bubbleEl = document.getElementById('bubble');
+const stageEl = document.getElementById('stage');
+const quizEl = document.getElementById('quiz');
+const quizAnimalEl = document.getElementById('quiz-animal');
+const optionsEl = document.getElementById('options');
+const progressEl = document.getElementById('progress');
+const feedbackEl = document.getElementById('feedback');
+
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+function speak(text, rate) {
+  return new Promise(resolve => {
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'zh-CN';
+    u.rate = rate || 0.8;
+    u.onend = resolve;
+    u.onerror = resolve;
+    speechSynthesis.speak(u);
+  });
+}
+
+function wait(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function speakWithPauses(parts, pauseMs, rate) {
+  for (let i = 0; i < parts.length; i++) {
+    await speak(parts[i], rate);
+    if (i < parts.length - 1) {
+      await wait(pauseMs);
+    }
+  }
+}
+
+function playTone(freq, duration, type) {
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = type || 'sine';
+  osc.frequency.value = freq;
+  gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.start();
+  osc.stop(audioCtx.currentTime + duration);
+}
+
+function playPositive() {
+  playTone(523, 0.1, 'sine');
+  setTimeout(() => playTone(659, 0.15, 'sine'), 100);
+}
+
+function playNegative() {
+  playTone(200, 0.15, 'square');
+  setTimeout(() => playTone(150, 0.3, 'square'), 150);
+}
+
+async function showDemo() {
+  if (demoIndex >= demoSequence.length) {
+    await wait(1000);
+    startQuiz();
+    return;
+  }
+  
+  const item = demoSequence[demoIndex];
+  demoAnimalEl.textContent = item.emoji;
+  demoAnimalEl.className = '';
+  bubbleEl.className = '';
+  bubbleEl.textContent = '';
+  
+  await wait(400);
+  demoAnimalEl.classList.add('show');
+  
+  // Name
+  await wait(800);
+  bubbleEl.textContent = item.name;
+  bubbleEl.classList.add('show');
+  await speak(item.name, 0.7);
+  
+  // Pause
+  await wait(1200);
+  
+  // Sound twice
+  bubbleEl.textContent = item.sound;
+  await speak(item.sound, 0.9);
+  await wait(600);
+  await speak(item.sound, 0.9);
+  
+  // Pause
+  await wait(1400);
+  
+  // Full phrase with internal pauses
+  bubbleEl.textContent = item.name + ' 叫 ' + item.sound;
+  await speakWithPauses([item.name, '叫', item.sound], 500, 0.7);
+  
+  // Hold
+  await wait(1200);
+  
+  demoAnimalEl.classList.remove('show');
+  bubbleEl.classList.remove('show');
+  
+  await wait(1000);
+  demoIndex++;
+  showDemo();
+}
+
+function startQuiz() {
+  stageEl.style.display = 'none';
+  quizEl.style.display = 'block';
+  showQuizItem();
+}
+
+async function showQuizItem() {
+  selectedOption = null;
+  
+  if (quizIndex >= quizItems.length) {
+    quizAnimalEl.textContent = '✓';
+    document.getElementById('quiz-prompt').style.display = 'none';
+    optionsEl.innerHTML = '';
+    document.getElementById('commit-btn').style.display = 'none';
+    progressEl.textContent = '完成!';
+    return;
+  }
+  
+  const item = quizItems[quizIndex];
+  quizAnimalEl.textContent = item.target.emoji;
+  progressEl.textContent = (quizIndex + 1) + ' / ' + quizItems.length;
+  
+  // Play target sound twice with pause
+  await wait(800);
+  await speak(item.target.sound, 0.9);
+  await wait(700);
+  await speak(item.target.sound, 0.9);
+  
+  optionsEl.innerHTML = '';
+  item.options.forEach((opt, i) => {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'option-wrapper';
+    
+    const bubble = document.createElement('div');
+    bubble.className = 'thought-bubble';
+    
+    const speakBtn = document.createElement('button');
+    speakBtn.className = 'speak-btn';
+    speakBtn.textContent = '🔊';
+    speakBtn.onclick = async (e) => {
+      e.stopPropagation();
+      await speak(opt.sound, 0.9);
+    };
+    bubble.appendChild(speakBtn);
+    
+    const selectBtn = document.createElement('button');
+    selectBtn.className = 'select-btn';
+    selectBtn.textContent = String.fromCharCode(65 + i);
+    selectBtn.onclick = () => {
+      document.querySelectorAll('.select-btn').forEach(b => b.classList.remove('selected'));
+      selectBtn.classList.add('selected');
+      selectedOption = i;
+    };
+    
+    wrapper.appendChild(bubble);
+    wrapper.appendChild(selectBtn);
+    optionsEl.appendChild(wrapper);
+  });
+}
+
+async function commitAnswer() {
+  if (selectedOption === null) return;
+  
+  const item = quizItems[quizIndex];
+  const chosen = item.options[selectedOption];
+  
+  if (chosen.correct) {
+    feedbackEl.textContent = '✓';
+    feedbackEl.style.color = '#4f4';
+    feedbackEl.style.opacity = 1;
+    playPositive();
+    await wait(500);
+    await speak(chosen.sound, 0.8);
+  } else {
+    feedbackEl.textContent = '✗';
+    feedbackEl.style.color = '#f44';
+    feedbackEl.style.opacity = 1;
+    playNegative();
+  }
+  
+  await wait(1800);
+  feedbackEl.style.opacity = 0;
+  quizIndex++;
+  showQuizItem();
+}
+
+document.body.addEventListener('click', function init() {
+  audioCtx.resume();
+  document.body.removeEventListener('click', init);
+}, { once: true });
+
+setTimeout(showDemo, 800);
+</script>
+
+</body>
+</html>

@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>炼金术</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { 
+  background: #1a1a2e; 
+  color: #eee; 
+  font-family: system-ui, sans-serif;
+  overflow: hidden;
+  user-select: none;
+}
+
+#workspace {
+  position: absolute;
+  top: 0; left: 0; right: 200px; bottom: 0;
+  background: #16213e;
+}
+
+#sidebar {
+  position: absolute;
+  top: 0; right: 0; bottom: 0; width: 200px;
+  background: #0f3460;
+  overflow-y: auto;
+  padding: 10px;
+}
+
+#sidebar h2 {
+  text-align: center;
+  margin-bottom: 10px;
+  font-size: 16px;
+  color: #e94560;
+}
+
+#inventory {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.element {
+  position: absolute;
+  background: #533483;
+  border-radius: 8px;
+  padding: 8px 12px;
+  cursor: grab;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 20px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  transition: box-shadow 0.2s;
+}
+
+.element:hover {
+  box-shadow: 0 4px 16px rgba(233,69,96,0.4);
+}
+
+.element.dragging {
+  cursor: grabbing;
+  z-index: 1000;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+}
+
+.element .emoji { font-size: 24px; }
+.element .hanzi { font-size: 18px; }
+
+.sidebar-item {
+  background: #533483;
+  border-radius: 6px;
+  padding: 6px 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 16px;
+}
+
+.sidebar-item:hover {
+  background: #e94560;
+}
+
+.sidebar-item .emoji { font-size: 20px; }
+.sidebar-item .hanzi { font-size: 14px; }
+
+#count {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  color: #e94560;
+  font-size: 14px;
+}
+
+#clear-btn {
+  position: absolute;
+  bottom: 10px;
+  right: 220px;
+  background: #e94560;
+  border: none;
+  color: white;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.combine-flash {
+  animation: flash 0.3s ease-out;
+}
+
+@keyframes flash {
+  0% { transform: scale(1.3); background: #e94560; }
+  100% { transform: scale(1); }
+}
+
+#new-discovery {
+  position: absolute;
+  top: 50%;
+  left: calc(50% - 100px);
+  transform: translate(-50%, -50%);
+  background: #e94560;
+  padding: 20px 40px;
+  border-radius: 12px;
+  font-size: 32px;
+  display: none;
+  z-index: 2000;
+  animation: popIn 0.4s ease-out;
+}
+
+@keyframes popIn {
+  0% { transform: translate(-50%, -50%) scale(0); opacity: 0; }
+  100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+}
+</style>
+</head>
+<body>
+
+<div id="workspace"></div>
+<div id="sidebar">
+  <h2>元素</h2>
+  <div id="inventory"></div>
+</div>
+<div id="count"></div>
+<button id="clear-btn">清空</button>
+<div id="new-discovery"></div>
+
+<script>
+const ELEMENTS = {
+  // 基本四元素
+  fire: { emoji: '🔥', hanzi: '火' },
+  water: { emoji: '💧', hanzi: '水' },
+  earth: { emoji: '🪨', hanzi: '土' },
+  air: { emoji: '💨', hanzi: '风' },
+  
+  // 可合成元素
+  steam: { emoji: '♨️', hanzi: '气' },
+  mud: { emoji: '🟤', hanzi: '泥' },
+  lava: { emoji: '🌋', hanzi: '岩' },
+  dust: { emoji: '🌫️', hanzi: '尘' },
+  rain: { emoji: '🌧️', hanzi: '雨' },
+  sea: { emoji: '🌊', hanzi: '海' },
+  mountain: { emoji: '⛰️', hanzi: '山' },
+  sun: { emoji: '☀️', hanzi: '日' },
+  moon: { emoji: '🌙', hanzi: '月' },
+  star: { emoji: '⭐', hanzi: '星' },
+  cloud: { emoji: '☁️', hanzi: '云' },
+  snow: { emoji: '❄️', hanzi: '雪' },
+  ice: { emoji: '🧊', hanzi: '冰' },
+  plant: { emoji: '🌱', hanzi: '草' },
+  tree: { emoji: '🌳', hanzi: '木' },
+  flower: { emoji: '🌸', hanzi: '花' },
+  fruit: { emoji: '🍎', hanzi: '果' },
+  bird: { emoji: '🐦', hanzi: '鸟' },
+  fish: { emoji: '🐟', hanzi: '鱼' },
+  egg: { emoji: '🥚', hanzi: '蛋' },
+  stone: { emoji: '🪨', hanzi: '石' },
+  metal: { emoji: '🔩', hanzi: '金' },
+  sand: { emoji: '🏖️', hanzi: '沙' },
+  glass: { emoji: '🪟', hanzi: '玻' },
+  fire2: { emoji: '🔥', hanzi: '炎' },
+  lake: { emoji: '🏞️', hanzi: '湖' },
+  river: { emoji: '🏞️', hanzi: '河' },
+  wind: { emoji: '🌀', hanzi: '旋' },
+  thunder: { emoji: '⚡', hanzi: '雷' },
+  light: { emoji: '💡', hanzi: '光' },
+  ash: { emoji: 'ite', hanzi: '灰' },
+  coal: { emoji: '⚫', hanzi: '炭' },
+  sky: { emoji: '🌌', hanzi: '天' },
+  human: { emoji: '🧑', hanzi: '人' },
+  house: { emoji: '🏠', hanzi: '屋' },
+  field: { emoji: '🌾', hanzi: '田' },
+  rice: { emoji: '🍚', hanzi: '米' },
+  meat: { emoji: '🍖', hanzi: '肉' },
+  dog: { emoji: '🐕', hanzi: '狗' },
+  cat: { emoji: '🐈', hanzi: '猫' },
+  horse: { emoji: '🐎', hanzi: '马' },
+  cow: { emoji: '🐄', hanzi: '牛' },
+  pig: { emoji: '🐖', hanzi: '猪' },
+  sheep: { emoji: '🐑', hanzi: '羊' },
+  dragon: { emoji: '🐉', hanzi: '龙' },
+  phoenix: { emoji: '🦅', hanzi: '凤' },
+  sword: { emoji: '🗡️', hanzi: '剑' },
+  wheel: { emoji: '🛞', hanzi: '轮' },
+  cart: { emoji: '🛒', hanzi: '车' },
+  boat: { emoji: '🚣', hanzi: '舟' },
+  wine: { emoji: '🍷', hanzi: '酒' },
+  salt: { emoji: '🧂', hanzi: '盐' },
+  oil: { emoji: '🛢️', hanzi: '油' },
+  paper: { emoji: '📄', hanzi: '纸' },
+  book: { emoji: '📖', hanzi: '书' },
+  ink: { emoji: '🖤', hanzi: '墨' },
+  brush: { emoji: '🖌️', hanzi: '笔' },
+  silk: { emoji: '🧣', hanzi: '丝' },
+  cloth: { emoji: '🧶', hanzi: '布' },
+  needle: { emoji: '🪡', hanzi: '针' },
+  pot: { emoji: '🍲', hanzi: '锅' },
+  tea: { emoji: '🍵', hanzi: '茶' },
+  medicine: { emoji: '💊', hanzi: '药' },
+  ghost: { emoji: '👻', hanzi: '鬼' },
+  god: { emoji: '👼', hanzi: '神' },
+  love: { emoji: '❤️', hanzi: '爱' },
+  life: { emoji: '🌿', hanzi: '生' },
+  death: { emoji: '💀', hanzi: '死' },
+  time: { emoji: '⏰', hanzi: '时' },
+  night: { emoji: '🌃', hanzi: '夜' },
+  day: { emoji: '🌅', hanzi: '昼' },
+  spring: { emoji: '🌷', hanzi: '春' },
+  summer: { emoji: '🌻', hanzi: '夏' },
+  autumn: { emoji: '🍂', hanzi: '秋' },
+  winter: { emoji: '⛄', hanzi: '冬' },
+  year: { emoji: '📅', hanzi: '年' },
+};
+
+// 合成配方 [元素1, 元素2] = 结果
+const RECIPES = {
+  'fire+water': 'steam',
+  'water+fire': 'steam',
+  'earth+water': 'mud',
+  'water+earth': 'mud',
+  'fire+earth': 'lava',
+  'earth+fire': 'lava',
+  'air+earth': 'dust',
+  'earth+air': 'dust',
+  'air+water': 'cloud',
+  'water+air': 'cloud',
+  'fire+air': 'dust',
+  'air+fire': 'dust',
+  'cloud+water': 'rain',
+  'water+cloud': 'rain',
+  'water+water': 'sea',
+  'earth+earth': 'mountain',
+  'fire+fire': 'sun',
+  'air+air': 'wind',
+  'cloud+cloud': 'rain',
+  'rain+earth': 'mud',
+  'earth+rain': 'mud',
+  'rain+mud': 'plant',
+  'mud+rain': 'plant',
+  'water+mud': 'plant',
+  'mud+water': 'plant',
+  'plant+earth': 'tree',
+  'earth+plant': 'tree',
+  'plant+water': 'flower',
+  'water+plant': 'flower',
+  'plant+sun': 'tree',
+  'sun+plant': 'tree',
+  'tree+sun': 'fruit',
+  'sun+tree': 'fruit',
+  'flower+sun': 'fruit',
+  'sun+flower': 'fruit',
+  'air+bird': 'egg',
+  'bird+air': 'egg',
+  'water+fish': 'egg',
+  'fish+water': 'egg',
+  'lava+water': 'stone',
+  'water+lava': 'stone',
+  'lava+air': 'stone',
+  'air+lava': 'stone',
+  'stone+fire': 'metal',
+  'fire+stone': 'metal',
+  'stone+air': 'sand',
+  'air+stone': 'sand',
+  'stone+wind': 'sand',
+  'wind+stone': 'sand',
+  'sand+fire': 'glass',
+  'fire+sand': 'glass',
+  'sun+fire': 'fire2',
+  'fire+sun': 'fire2',
+  'rain+mountain': 'river',
+  'mountain+rain': 'river',
+  'rain+earth': 'lake',
+  'rain+rain': 'lake',
+  'river+river': 'sea',
+  'lake+lake': 'sea',
+  'cloud+fire': 'thunder',
+  'fire+cloud': 'thunder',
+  'rain+thunder': 'thunder',
+  'thunder+rain': 'thunder',
+  'sun+glass': 'light',
+  'glass+sun': 'light',
+  'fire+wood': 'ash',
+  'wood+fire': 'ash',
+  'fire+tree': 'ash',
+  'tree+fire': 'ash',
+  'fire+tree': 'coal',
+  'tree+earth': 'coal',
+  'earth+tree': 'coal',
+  'air+sun': 'sky',
+  'sun+air': 'sky',
+  'cloud+sun': 'sky',
+  'sun+cloud': 'sky',
+  'mud+life': 'human',
+  'life+mud': 'human',
+  'earth+life': 'human',
+  'life+earth': 'human',
+  'stone+tree': 'house',
+  'tree+stone': 'house',
+  'human+earth': 'field',
+  'earth+human': 'field',
+  'field+water': 'rice',
+  'water+field': 'rice',
+  'plant+field': 'rice',
+  'field+plant': 'rice',
+  'egg+air': 'bird',
+  'air+egg': 'bird',
+  'egg+water': 'fish',
+  'water+egg': 'fish',
+  'bird+earth': 'dog',
+  'earth+bird': 'dog',
+  'fish+earth': 'cat',
+  'earth+fish': 'cat',
+  'human+plant': 'dog',
+  'plant+human': 'dog',
+  'dog+air': 'horse',
+  'air+dog': 'horse',
+  'earth+plant': 'cow',
+  'plant+earth': 'cow',
+  'mud+plant': 'pig',
+  'plant+mud': 'pig',
+  'cloud+plant': 'sheep',
+  'plant+cloud': 'sheep',
+  'fire+fish': 'dragon',
+  'fish+fire': 'dragon',
+  'snake+fire': 'dragon',
+  'fire+snake': 'dragon',
+  'bird+fire': 'phoenix',
+  'fire+bird': 'phoenix',
+  'metal+fire': 'sword',
+  'fire+metal': 'sword',
+  'tree+metal': 'wheel',
+  'metal+tree': 'wheel',
+  'wheel+tree': 'cart',
+  'tree+wheel': 'cart',
+  'tree+water': 'boat',
+  'water+tree': 'boat',
+  'fruit+water': 'wine',
+  'water+fruit': 'wine',
+  'rice+water': 'wine',
+  'water+rice': 'wine',
+  'sea+sun': 'salt',
+  'sun+sea': 'salt',
+  'water+sun': 'salt',
+  'plant+fire': 'oil',
+  'fire+plant': 'oil',
+  'tree+water': 'paper',
+  'water+tree': 'paper',
+  'paper+paper': 'book',
+  'coal+water': 'ink',
+  'water+coal': 'ink',
+  'ash+water': 'ink',
+  'water+ash': 'ink',
+  'tree+ink': 'brush',
+  'ink+tree': 'brush',
+  'plant+water': 'silk',
+  'silk+silk': 'cloth',
+  'metal+fire': 'needle',
+  'fire+metal': 'needle',
+  'metal+earth': 'pot',
+  'earth+metal': 'pot',
+  'plant+water': 'tea',
+  'water+plant': 'tea',
+  'plant+fire': 'medicine',
+  'fire+plant': 'medicine',
+  'human+death': 'ghost',
+  'death+human': 'ghost',
+  'human+sky': 'god',
+  'sky+human': 'god',
+  'ghost+light': 'god',
+  'light+ghost': 'god',
+  'human+human': 'love',
+  'fire+water': 'life',
+  'sun+earth': 'life',
+  'earth+sun': 'life',
+  'fire+death': 'ash',
+  'death+fire': 'ash',
+  'time+human': 'death',
+  'human+time': 'death',
+  'sun+moon': 'time',
+  'moon+sun': 'time',
+  'sky+sun': 'day',
+  'sun+sky': 'day',
+  'sky+moon': 'night',
+  'moon+sky': 'night',
+  'flower+rain': 'spring',
+  'rain+flower': 'spring',
+  'sun+sun': 'summer',
+  'tree+wind': 'autumn',
+  'wind+tree': 'autumn',
+  'cloud+ice': 'winter',
+  'ice+cloud': 'winter',
+  'snow+wind': 'winter',
+  'wind+snow': 'winter',
+  'water+air': 'ice',
+  'cold+water': 'ice',
+  'cloud+cold': 'snow',
+  'rain+cold': 'snow',
+  'rain+winter': 'snow',
+  'winter+rain': 'snow',
+  'water+winter': 'ice',
+  'winter+water': 'ice',
+  'spring+summer': 'year',
+  'summer+autumn': 'year',
+  'autumn+winter': 'year',
+  'winter+spring': 'year',
+  'day+night': 'time',
+  'night+day': 'time',
+  'star+star': 'moon',
+  'sky+night': 'star',
+  'night+sky': 'star',
+  'light+night': 'star',
+  'night+light': 'star',
+};
+
+let discovered = new Set(['fire', 'water', 'earth', 'air']);
+let workspaceElements = [];
+let dragElement = null;
+let offsetX = 0, offsetY = 0;
+
+const workspace = document.getElementById('workspace');
+const inventory = document.getElementById('inventory');
+const countDisplay = document.getElementById('count');
+const clearBtn = document.getElementById('clear-btn');
+const newDiscovery = document.getElementById('new-discovery');
+
+function speak(text) {
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = 'zh-CN';
+  utterance.rate = 0.8;
+  speechSynthesis.speak(utterance);
+}
+
+function updateCount() {
+  countDisplay.textContent = `${discovered.size} / ${Object.keys(ELEMENTS).length}`;
+}
+
+function renderInventory() {
+  inventory.innerHTML = '';
+  const sorted = Array.from(discovered).sort((a, b) => {
+    return ELEMENTS[a].hanzi.localeCompare(ELEMENTS[b].hanzi, 'zh');
+  });
+  
+  sorted.forEach(id => {
+    const el = ELEMENTS[id];
+    const item = document.createElement('div');
+    item.className = 'sidebar-item';
+    item.innerHTML = `<span class="emoji">${el.emoji}</span><span class="hanzi">${el.hanzi}</span>`;
+    item.onclick = () => {
+      speak(el.hanzi);
+      spawnElement(id, 100 + Math.random() * 200, 100 + Math.random() * 200);
+    };
+    inventory.appendChild(item);
+  });
+  updateCount();
+}
+
+function spawnElement(id, x, y) {
+  const el = ELEMENTS[id];
+  const div = document.createElement('div');
+  div.className = 'element';
+  div.dataset.id = id;
+  div.innerHTML = `<span class="emoji">${el.emoji}</span><span class="hanzi">${el.hanzi}</span>`;
+  div.style.left = x + 'px';
+  div.style.top = y + 'px';
+  
+  div.onmousedown = startDrag;
+  div.ondblclick = () => {
+    speak(el.hanzi);
+  };
+  
+  workspace.appendChild(div);
+  workspaceElements.push(div);
+  return div;
+}
+
+function startDrag(e) {
+  dragElement = e.currentTarget;
+  dragElement.classList.add('dragging');
+  const rect = dragElement.getBoundingClientRect();
+  const wsRect = workspace.getBoundingClientRect();
+  offsetX = e.clientX - rect.left;
+  offsetY = e.clientY - rect.top;
+  
+  document.onmousemove = onDrag;
+  document.onmouseup = endDrag;
+}
+
+function onDrag(e) {
+  if (!dragElement) return;
+  const wsRect = workspace.getBoundingClientRect();
+  let x = e.clientX - wsRect.left - offsetX;
+  let y = e.clientY - wsRect.top - offsetY;
+  
+  x = Math.max(0, Math.min(x, wsRect.width - dragElement.offsetWidth));
+  y = Math.max(0, Math.min(y, wsRect.height - dragElement.offsetHeight));
+  
+  dragElement.style.left = x + 'px';
+  dragElement.style.top = y + 'px';
+}
+
+function endDrag(e) {
+  if (!dragElement) return;
+  dragElement.classList.remove('dragging');
+  
+  // 检查碰撞
+  const dragRect = dragElement.getBoundingClientRect();
+  
+  for (const other of workspaceElements) {
+    if (other === dragElement) continue;
+    
+    const otherRect = other.getBoundingClientRect();
+    
+    if (dragRect.left < otherRect.right &&
+        dragRect.right > otherRect.left &&
+        dragRect.top < otherRect.bottom &&
+        dragRect.bottom > otherRect.top) {
+      
+      // 碰撞！尝试合成
+      const id1 = dragElement.dataset.id;
+      const id2 = other.dataset.id;
+      const key = `${id1}+${id2}`;
+      const result = RECIPES[key];
+      
+      if (result && ELEMENTS[result]) {
+        const newX = (parseFloat(dragElement.style.left) + parseFloat(other.style.left)) / 2;
+        const newY = (parseFloat(dragElement.style.top) + parseFloat(other.style.top)) / 2;
+        
+        // 移除旧元素
+        dragElement.remove();
+        other.remove();
+        workspaceElements = workspaceElements.filter(el => el !== dragElement && el !== other);
+        
+        // 创建新元素
+        const newEl = spawnElement(result, newX, newY);
+        newEl.classList.add('combine-flash');
+        setTimeout(() => newEl.classList.remove('combine-flash'), 300);
+        
+        // 播放发音
+        speak(ELEMENTS[result].hanzi);
+        
+        // 新发现？
+        if (!discovered.has(result)) {
+          discovered.add(result);
+          renderInventory();
+          showDiscovery(result);
+        }
+        
+        dragElement = null;
+        document.onmousemove = null;
+        document.onmouseup = null;
+        return;
+      }
+    }
+  }
+  
+  dragElement = null;
+  document.onmousemove = null;
+  document.onmouseup = null;
+}
+
+function showDiscovery(id) {
+  const el = ELEMENTS[id];
+  newDiscovery.innerHTML = `${el.emoji} ${el.hanzi}`;
+  newDiscovery.style.display = 'block';
+  setTimeout(() => {
+    newDiscovery.style.display = 'none';
+  }, 1500);
+}
+
+clearBtn.onclick = () => {
+  workspaceElements.forEach(el => el.remove());
+  workspaceElements = [];
+};
+
+// 初始化
+renderInventory();
+
+// 放置初始元素
+spawnElement('fire', 100, 100);
+spawnElement('water', 200, 100);
+spawnElement('earth', 100, 200);
+spawnElement('air', 200, 200);
+</script>
+</body>
+</html>
