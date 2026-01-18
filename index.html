@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Learning Hub | 学习中心</title>
+    <title>学习中心 | Chinese Lessons</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            background: #1a1a2e; /* Matches your lesson background */
+            background: #1a1a2e;
             color: #eee;
             font-family: system-ui, -apple-system, sans-serif;
             display: flex;
@@ -30,69 +30,81 @@
             width: 100%;
             max-width: 600px;
             display: grid;
-            gap: 20px;
+            gap: 15px;
         }
         .lesson-card {
             background: #3a3a5c;
             text-decoration: none;
             color: white;
-            padding: 25px;
-            border-radius: 15px;
+            padding: 20px;
+            border-radius: 12px;
             display: flex;
             align-items: center;
-            transition: transform 0.2s, background 0.2s;
-            border: 1px solid rgba(255,255,255,0.1);
+            transition: transform 0.2s, background 0.2s, border-color 0.2s;
+            border: 1px solid rgba(255,255,255,0.05);
         }
         .lesson-card:hover {
-            transform: translateY(-3px);
+            transform: translateX(5px);
             background: #4a4a7c;
+            border-color: #4f4;
         }
         .lesson-number {
-            font-size: 1.5rem;
+            font-size: 1.2rem;
             font-weight: bold;
             margin-right: 20px;
-            color: #4f4; /* Hint of green for progress */
-            min-width: 40px;
+            color: #4f4;
+            opacity: 0.8;
+            width: 30px;
         }
         .lesson-info {
             flex-grow: 1;
         }
         .lesson-title {
-            font-size: 1.3rem;
+            font-size: 1.2rem;
             font-weight: 500;
         }
-        .lesson-tags {
-            font-size: 0.9rem;
-            color: #aaa;
-            margin-top: 4px;
-        }
         .arrow {
-            font-size: 1.5rem;
-            opacity: 0.5;
+            font-size: 1.2rem;
+            opacity: 0.3;
         }
     </style>
 </head>
 <body>
 
     <h1>课程目录</h1>
-    <p class="subtitle">Learning Chinese: People & Things</p>
+    <p class="subtitle">Mandarin Chinese Interactive Lessons</p>
 
     <div class="lesson-grid">
         <a href="001 person_thing.html" class="lesson-card">
             <div class="lesson-number">01</div>
             <div class="lesson-info">
                 <div class="lesson-title">人 / 东西</div>
-                <div class="lesson-tags">Person vs. Thing • 👨‍🦰 🍎</div>
             </div>
             <div class="arrow">→</div>
         </a>
 
-        <a href="#" class="lesson-card" style="opacity: 0.6; pointer-events: none;">
+        <a href="002 big_small.html" class="lesson-card">
             <div class="lesson-number">02</div>
             <div class="lesson-info">
-                <div class="lesson-title">Coming Soon...</div>
-                <div class="lesson-tags">Locked</div>
+                <div class="lesson-title">大 / 小</div>
             </div>
+            <div class="arrow">→</div>
+        </a>
+
+        <a href="003 i_you.html" class="lesson-card">
+            <div class="lesson-number">03</div>
+            <div class="lesson-info">
+                <div class="lesson-title">我 / 你</div>
+            </div>
+            <div class="arrow">→</div>
+        </a>
+
+        <a href="004 this_that.html" class="lesson-card">
+            <div class="lesson-number">04</div>
+            <div class="lesson-info">
+                <div class="lesson-title">这 / 那</div>
+            </div>
+            <div class="arrow">→</div>
         </a>
     </div>
 
